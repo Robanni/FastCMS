@@ -1,8 +1,12 @@
 from sqlalchemy.orm import DeclarativeBase
 
+from fastcms.permission import BasePermission
+
 
 class Resource:
     model: type[DeclarativeBase]
+
+    permissions: dict[str, BasePermission] = {}
 
     search_fields: list[str] = []
     sort_fields: list[str] = []
