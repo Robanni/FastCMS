@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "Robanni", email = "robanniba@gmail.com" }]
-dependencies = ["fastapi>=0.100.0", "sqlalchemy>=2.0"]
+dependencies = ["fastapi>=0.100.0", "sqlalchemy>=2.0", "pydantic>=2.0"]
 
 [project.optional-dependencies]
 dev = ["pytest", "httpx"]

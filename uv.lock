@@ -73,6 +73,7 @@ version = "0.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "pydantic" },
     { name = "sqlalchemy" },
 ]
 
@@ -92,6 +93,7 @@ dev = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.100.0" },
     { name = "httpx", marker = "extra == 'dev'" },
+    { name = "pydantic", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "sqlalchemy", specifier = ">=2.0" },
 ]
