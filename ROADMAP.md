@@ -15,9 +15,31 @@ class ArticleResource(Resource):
 - Offset/limit pagination
 - OpenAPI support
 
-## v0.2 — Filters, Permissions, Hooks
+## v0.2 — Permissions, Filters, Hooks ✅ (permissions done)
 
-- **Typed filters** via `Filter` class
+### Permissions ✅
+
+```python
+class IsAuthenticated(BasePermission):
+    async def __call__(self, request: Request) -> None:
+        token = request.headers.get("Authorization")
+        if not token:
+            raise HTTPException(status_code=401)
+
+class ArticleResource(Resource):
+    model = Article
+    permissions = {
+        "list": IsAuthenticated(),
+        "create": IsEditor(),
+        "delete": IsAdmin(),
+    }
+```
+
+- `BasePermission` — contract, user implements auth logic
+- Sync and async `__call__` both supported
+- Missing key = open endpoint (no permission check)
+
+### Filters — TODO
 
 ```python
 class ArticleFilter(Filter):
@@ -25,18 +47,9 @@ class ArticleFilter(Filter):
     author_id: int
 ```
 
-- **Per-action permissions**
+Auto query params: `GET /articles?published=true&author_id=5`
 
-```python
-class ArticleResource(Resource):
-    permissions = {
-        "list": IsAuthenticated,
-        "create": IsEditor,
-        "delete": IsAdmin,
-    }
-```
-
-- **Lifecycle hooks**
+### Hooks — TODO
 
 ```python
 class ArticleResource(Resource):
