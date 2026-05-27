@@ -1,15 +1,33 @@
 from pydantic import BaseModel, create_model
-from sqlalchemy import String, Integer, Boolean, DateTime, inspect
+from sqlalchemy import (
+    String, Text, Integer, BigInteger, SmallInteger,
+    Boolean, DateTime, Date, Time,
+    Float, Numeric, UUID, Enum, JSON, LargeBinary,
+    inspect,
+)
 import datetime
+import decimal
+import uuid
 
 from sqlalchemy.orm import DeclarativeBase
 
 
 TYPE_MAP: dict[type, type] = {
     String: str,
+    Text: str,
     Integer: int,
+    BigInteger: int,
+    SmallInteger: int,
     Boolean: bool,
     DateTime: datetime.datetime,
+    Date: datetime.date,
+    Time: datetime.time,
+    Float: float,
+    Numeric: decimal.Decimal,
+    UUID: uuid.UUID,
+    Enum: str,
+    JSON: dict,
+    LargeBinary: bytes,
 }
 
 
@@ -34,7 +52,10 @@ def _extract_fields(model: type[DeclarativeBase]) -> dict[str, dict[str, object]
         column_type = type(column.type)
 
         if (python_type := TYPE_MAP.get(column_type)) is None:
-            raise ValueError(f"{column_type} is not supported!")
+            try:
+                python_type = column.type.python_type
+            except NotImplementedError:
+                raise ValueError(f"Unsupported column type: {column_type.__name__}")
 
         has_server_default = column.default is not None or column.server_default is not None
 
