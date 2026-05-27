@@ -57,8 +57,7 @@ class CrudService(Generic[T]):
         if obj is None:
             return None
         for key, value in data.items():
-            if value is not None:
-                setattr(obj, key, value)
+            setattr(obj, key, value)
         session.commit()
         session.refresh(obj)
         return obj
@@ -106,8 +105,7 @@ class CrudService(Generic[T]):
         if obj is None:
             return None
         for key, value in data.items():
-            if value is not None:
-                setattr(obj, key, value)
+            setattr(obj, key, value)
         await session.commit()
         await session.refresh(obj)
         return obj
