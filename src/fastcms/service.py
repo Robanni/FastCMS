@@ -24,8 +24,17 @@ class CrudService(Generic[T]):
         self.async_mode = _is_async(get_session)
 
     # --- sync ---
-    def get_list(self, session: Session, offset: int = 0, limit: int = 20) -> list[T]:
-        result = session.execute(select(self.model).offset(offset).limit(limit))
+    def get_list(
+        self,
+        session: Session,
+        offset: int = 0,
+        limit: int = 20,
+        filters=None,
+    ) -> list[T]:
+        query = select(self.model)
+        if filters is not None:
+            query = filters.apply(query, self.model)
+        result = session.execute(query.offset(offset).limit(limit))
         return result.scalars().all()
 
     def get_one(self, session: Session, id: int) -> T | None:
@@ -58,13 +67,13 @@ class CrudService(Generic[T]):
         self,
         session: Session,
         id: int,
-    ) -> bool:
+    ) -> T | None:
         obj = session.get(self.model, id)
         if obj is None:
-            return False
+            return None
         session.delete(obj)
         session.commit()
-        return True
+        return obj
 
     # --- async ---
     async def async_get_list(
@@ -72,8 +81,12 @@ class CrudService(Generic[T]):
         session: AsyncSession,
         limit: int = 20,
         offset: int = 0,
+        filters=None,
     ) -> list[T]:
-        result = await session.execute(select(self.model).offset(offset).limit(limit))
+        query = select(self.model)
+        if filters is not None:
+            query = filters.apply(query, self.model)
+        result = await session.execute(query.offset(offset).limit(limit))
         return result.scalars().all()
 
     async def async_get_one(self, session: AsyncSession, id: int) -> T | None:
@@ -99,10 +112,10 @@ class CrudService(Generic[T]):
         await session.refresh(obj)
         return obj
 
-    async def async_delete(self, session: AsyncSession, id: int) -> bool:
+    async def async_delete(self, session: AsyncSession, id: int) -> T | None:
         obj = await session.get(self.model, id)
         if obj is None:
-            return False
+            return None
         await session.delete(obj)
         await session.commit()
-        return True
+        return obj

@@ -36,10 +36,13 @@ def _extract_fields(model: type[DeclarativeBase]) -> dict[str, dict[str, object]
         if (python_type := TYPE_MAP.get(column_type)) is None:
             raise ValueError(f"{column_type} is not supported!")
 
+        has_server_default = column.default is not None or column.server_default is not None
+
         fields[column.key] = {
             "type": python_type,
             "nullable": column.nullable,
             "primary_key": column.primary_key,
+            "has_default": has_server_default,
         }
 
     return fields
@@ -48,18 +51,26 @@ def _extract_fields(model: type[DeclarativeBase]) -> dict[str, dict[str, object]
 def _build_read(
     fields: dict[str, dict[str, object]], model_name: str
 ) -> type[BaseModel]:
-    pydantic_fields = {key: (info["type"], ...) for key, info in fields.items()}
+    pydantic_fields = {}
+    for key, info in fields.items():
+        if info["nullable"]:
+            pydantic_fields[key] = (info["type"] | None, None)
+        else:
+            pydantic_fields[key] = (info["type"], ...)
     return create_model(f"{model_name}Read", **pydantic_fields)
 
 
 def _build_create(
     fields: dict[str, dict[str, object]], model_name: str
 ) -> type[BaseModel]:
-    pydantic_fields = {
-        key: (info["type"], ...)
-        for key, info in fields.items()
-        if not info["primary_key"]
-    }
+    pydantic_fields = {}
+    for key, info in fields.items():
+        if info["primary_key"]:
+            continue
+        if info["nullable"] or info["has_default"]:
+            pydantic_fields[key] = (info["type"] | None, None)
+        else:
+            pydantic_fields[key] = (info["type"], ...)
     return create_model(f"{model_name}Create", **pydantic_fields)
 
 

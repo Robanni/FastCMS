@@ -1,5 +1,5 @@
 import pytest
-from sqlalchemy import create_engine, String, Integer
+from sqlalchemy import Boolean, create_engine, Integer, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
 from sqlalchemy.pool import StaticPool
 
@@ -13,6 +13,8 @@ class Article(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     title: Mapped[str] = mapped_column(String)
+    published: Mapped[bool] = mapped_column(Boolean, default=False)
+    author_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 @pytest.fixture(scope="function")
@@ -48,6 +50,27 @@ def app(engine):
 
     class ArticleResource(Resource):
         model = Article
+
+    def get_session() -> Session:
+        return Session(engine)
+
+    application = FastAPI()
+    setup(application, resources=[ArticleResource], get_session=get_session)
+    return application
+
+
+@pytest.fixture
+def app_with_filter(engine):
+    from fastapi import FastAPI
+    from fastcms import Filter, Resource, setup
+
+    class ArticleFilter(Filter):
+        published: bool | None = None
+        author_id: int | None = None
+
+    class ArticleResource(Resource):
+        model = Article
+        filter_class = ArticleFilter
 
     def get_session() -> Session:
         return Session(engine)

@@ -1,12 +1,22 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from sqlalchemy.orm import DeclarativeBase
 
 from fastcms.permission import BasePermission
+
+if TYPE_CHECKING:
+    from fastcms.filter import Filter
 
 
 class Resource:
     model: type[DeclarativeBase]
 
     permissions: dict[str, BasePermission] = {}
+
+    # Optional filter class — subclass of Filter
+    filter_class: type[Filter] | None = None
 
     search_fields: list[str] = []
     sort_fields: list[str] = []

@@ -157,6 +157,35 @@ Both sync and async `__call__` are supported.
 
 ---
 
+## Filters
+
+Add query parameter filtering to list endpoints via `filter_class`.
+
+```python
+from fastcms import Filter
+
+class ArticleFilter(Filter):
+    published: bool | None = None
+    author_id: int | None = None
+
+class ArticleResource(Resource):
+    model = Article
+    filter_class = ArticleFilter
+```
+
+Each declared field becomes an optional query param. `None` fields are ignored — no WHERE clause added.
+
+```
+GET /articles/                          → all articles
+GET /articles/?published=true           → published only
+GET /articles/?author_id=5              → by author
+GET /articles/?published=true&author_id=5  → combined
+```
+
+Fields not present in the model are silently ignored.
+
+---
+
 ## Resource Options
 
 ```python
@@ -165,6 +194,8 @@ class ArticleResource(Resource):
 
     prefix = "/posts"           # default: "/{model_name_lowercase}s"
     tags = ["Posts"]            # default: [model.__name__]
+
+    filter_class = ArticleFilter  # optional
 
     permissions = {
         "create": IsAuthenticated(),
@@ -175,4 +206,4 @@ class ArticleResource(Resource):
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for planned features including filters, hooks, search, sorting, and relation expansion.
+See [ROADMAP.md](ROADMAP.md) for planned features including hooks, search, sorting, and relation expansion.

@@ -15,7 +15,7 @@ class ArticleResource(Resource):
 - Offset/limit pagination
 - OpenAPI support
 
-## v0.2 — Permissions, Filters, Hooks ✅ (permissions done)
+## v0.2 — Permissions, Filters, Hooks ✅ (permissions + filters done)
 
 ### Permissions ✅
 
@@ -39,7 +39,7 @@ class ArticleResource(Resource):
 - Sync and async `__call__` both supported
 - Missing key = open endpoint (no permission check)
 
-### Filters — TODO
+### Filters ✅
 
 ```python
 class ArticleFilter(Filter):
@@ -48,6 +48,9 @@ class ArticleFilter(Filter):
 ```
 
 Auto query params: `GET /articles?published=true&author_id=5`
+
+- Equality filtering only (current implementation)
+- Future: lookup expressions via `__` suffix (`price__gte`, `title__contains`, `created_at__lt`)
 
 ### Hooks — TODO
 

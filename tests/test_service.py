@@ -56,9 +56,11 @@ def test_update_not_found(service: CrudService[Article], session):
 
 def test_delete(service: CrudService[Article], session):
     obj = service.create(session, {"title": "Delete me"})
-    assert service.delete(session, obj.id) is True
+    deleted = service.delete(session, obj.id)
+    assert deleted is not None
+    assert deleted.title == "Delete me"
     assert service.get_one(session, obj.id) is None
 
 
 def test_delete_not_found(service: CrudService[Article], session):
-    assert service.delete(session, 9999) is False
+    assert service.delete(session, 9999) is None
