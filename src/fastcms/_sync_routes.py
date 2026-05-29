@@ -3,7 +3,7 @@ import inspect
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
-from fastcms.dependencies import make_filter_dep, make_permission_dep
+from fastcms.dependencies import make_filter_dep, make_permission_dep, make_sort_dep
 from fastcms.resource import Resource
 from fastcms.service import CrudService
 
@@ -29,11 +29,20 @@ def build_sync_routes(
 
     ReadSchema, CreateSchema, UpdateSchema = schemas
     filter_dep = make_filter_dep(resource)
+    sort_dep = make_sort_dep(resource)
 
-    if filter_dep is not None:
+    if filter_dep is not None and sort_dep is not None:
         @router.get("/", response_model=list[ReadSchema], dependencies=[make_permission_dep("list", resource)])
-        def get_list(limit: int = 20, offset: int = 0, session=Depends(get_session), filters=filter_dep):
+        def get_list(limit: int = 20, offset: int = 0, session=Depends(get_session), filters=filter_dep, sort=sort_dep):
+            return service.get_list(session, offset, limit, filters=filters, sort=sort)
+    elif filter_dep is not None:
+        @router.get("/", response_model=list[ReadSchema], dependencies=[make_permission_dep("list", resource)])
+        def get_list(limit: int = 20, offset: int = 0, session=Depends(get_session), filters=filter_dep):  # type: ignore[misc]
             return service.get_list(session, offset, limit, filters=filters)
+    elif sort_dep is not None:
+        @router.get("/", response_model=list[ReadSchema], dependencies=[make_permission_dep("list", resource)])
+        def get_list(limit: int = 20, offset: int = 0, session=Depends(get_session), sort=sort_dep):  # type: ignore[misc]
+            return service.get_list(session, offset, limit, sort=sort)
     else:
         @router.get("/", response_model=list[ReadSchema], dependencies=[make_permission_dep("list", resource)])
         def get_list(limit: int = 20, offset: int = 0, session=Depends(get_session)):  # type: ignore[misc]

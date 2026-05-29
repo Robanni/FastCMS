@@ -1,5 +1,6 @@
 import inspect
-from sqlalchemy import select
+
+from sqlalchemy import Select, select, asc, desc
 from typing import Callable, Generic, TypeVar
 
 
@@ -23,6 +24,15 @@ class CrudService(Generic[T]):
         self.get_session = get_session
         self.async_mode = _is_async(get_session)
 
+    def _apply_sort(self, query: Select, sort_params):
+        if not sort_params:
+            return query
+        for field, descending in sort_params:
+            col = getattr(self.model, field, None)
+            if col is not None:
+                query = query.order_by(desc(col) if descending else asc(col))
+        return query
+
     # --- sync ---
     def get_list(
         self,
@@ -30,10 +40,12 @@ class CrudService(Generic[T]):
         offset: int = 0,
         limit: int = 20,
         filters=None,
+        sort=None,
     ) -> list[T]:
         query = select(self.model)
         if filters is not None:
             query = filters.apply(query, self.model)
+        query = self._apply_sort(query, sort)
         result = session.execute(query.offset(offset).limit(limit))
         return result.scalars().all()
 
@@ -56,6 +68,7 @@ class CrudService(Generic[T]):
 
     def delete(self, session: Session, obj: T) -> dict:
         from sqlalchemy import inspect as sa_inspect
+
         data = {c.key: getattr(obj, c.key) for c in sa_inspect(obj).mapper.column_attrs}
         session.delete(obj)
         session.commit()
@@ -68,10 +81,12 @@ class CrudService(Generic[T]):
         offset: int = 0,
         limit: int = 20,
         filters=None,
+        sort=None,
     ) -> list[T]:
         query = select(self.model)
         if filters is not None:
             query = filters.apply(query, self.model)
+        query = self._apply_sort(query, sort)
         result = await session.execute(query.offset(offset).limit(limit))
         return result.scalars().all()
 
@@ -94,6 +109,7 @@ class CrudService(Generic[T]):
 
     async def async_delete(self, session: AsyncSession, obj: T) -> dict:
         from sqlalchemy import inspect as sa_inspect
+
         data = {c.key: getattr(obj, c.key) for c in sa_inspect(obj).mapper.column_attrs}
         await session.delete(obj)
         await session.commit()

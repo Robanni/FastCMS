@@ -67,6 +67,33 @@ def make_filter_dep(resource: Resource) -> DependsType | None:
     return _make_list_filter_dep(filter_cls)
 
 
+def make_sort_dep(resource: Resource) -> DependsType | None:
+    allowed = resource.sort_fields
+    if not allowed:
+        return None
+
+    def _dep(sort: str | None = Query(default=None)) -> list[tuple[str, bool]] | None:
+        if sort is None:
+            return None
+        result = []
+        for part in sort.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            desc = part.startswith("-")
+            field = part.lstrip("-")
+            if field not in allowed:
+                from fastapi import HTTPException
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Sort field '{field}' not allowed. Allowed: {', '.join(allowed)}",
+                )
+            result.append((field, desc))
+        return result or None
+
+    return Depends(_dep)
+
+
 def make_permission_dep(action: str, resource: Resource) -> DependsType | None:
     async def dep(request: Request) -> None:
         permission = resource.permissions.get(action)
