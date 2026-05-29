@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from fastcms.dependencies import make_filter_dep, make_permission_dep
@@ -10,7 +10,7 @@ type AnySchema = type[BaseModel]
 
 def build_sync_routes(
     router: APIRouter,
-    resource: type[Resource],
+    resource: Resource,
     service: CrudService,
     get_session,
     schemas: tuple[AnySchema, AnySchema, AnySchema],
@@ -35,17 +35,30 @@ def build_sync_routes(
         return obj
 
     @router.post("/", response_model=ReadSchema, status_code=201, dependencies=[make_permission_dep("create", resource)])
-    def create_item(data: CreateSchema, session=Depends(get_session)):  # type: ignore[valid-type]
-        return service.create(session, data.model_dump())  # type: ignore[union-attr]
-
-    @router.patch("/{id}", response_model=ReadSchema, dependencies=[make_permission_dep("update", resource)])
-    def update_item(id: int, data: UpdateSchema, session=Depends(get_session)):  # type: ignore[valid-type]
-        obj = service.update(session, id, data.model_dump(exclude_unset=True))  # type: ignore[union-attr]
-        if obj is None:
-            raise HTTPException(status_code=404, detail="Item not found")
+    def create_item(request: Request, data: CreateSchema, session=Depends(get_session)):  # type: ignore[valid-type]
+        payload = resource.before_create(data.model_dump(), session, request)  # type: ignore[union-attr]
+        obj = service.create(session, payload)
+        resource.after_create(obj, session, request)
         return obj
 
-    @router.delete("/{id}", status_code=204, dependencies=[make_permission_dep("delete", resource)])
-    def delete_item(id: int, session=Depends(get_session)):
-        if service.delete(session, id) is None:
+    @router.patch("/{id}", response_model=ReadSchema, dependencies=[make_permission_dep("update", resource)])
+    def update_item(id: int, request: Request, data: UpdateSchema, session=Depends(get_session)):  # type: ignore[valid-type]
+        obj = service.get_one(session, id)
+        if obj is None:
             raise HTTPException(status_code=404, detail="Item not found")
+        patch = data.model_dump(exclude_unset=True)  # type: ignore[union-attr]
+        patch = resource.before_update(obj, patch, session, request)
+        updated = service.update(session, id, patch)
+        if updated is None:
+            raise HTTPException(status_code=404, detail="Item not found")
+        resource.after_update(updated, session, request)
+        return updated
+
+    @router.delete("/{id}", status_code=204, dependencies=[make_permission_dep("delete", resource)])
+    def delete_item(id: int, request: Request, session=Depends(get_session)):
+        obj = service.get_one(session, id)
+        if obj is None:
+            raise HTTPException(status_code=404, detail="Item not found")
+        resource.before_delete(obj, session, request)
+        service.delete(session, id)
+        resource.after_delete(obj, session, request)

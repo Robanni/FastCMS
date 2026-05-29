@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+import inspect
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from fastcms.dependencies import make_filter_dep, make_permission_dep
@@ -8,9 +10,16 @@ from fastcms.service import CrudService
 type AnySchema = type[BaseModel]
 
 
+async def _call(hook, *args):
+    result = hook(*args)
+    if inspect.isawaitable(result):
+        return await result
+    return result
+
+
 def build_async_routes(
     router: APIRouter,
-    resource: type[Resource],
+    resource: Resource,
     service: CrudService,
     get_session,
     schemas: tuple[AnySchema, AnySchema, AnySchema],
@@ -35,17 +44,30 @@ def build_async_routes(
         return obj
 
     @router.post("/", response_model=ReadSchema, status_code=201, dependencies=[make_permission_dep("create", resource)])
-    async def create_item(data: CreateSchema, session=Depends(get_session)):  # type: ignore[valid-type]
-        return await service.async_create(session, data.model_dump())  # type: ignore[union-attr]
-
-    @router.patch("/{id}", response_model=ReadSchema, dependencies=[make_permission_dep("update", resource)])
-    async def update_item(id: int, data: UpdateSchema, session=Depends(get_session)):  # type: ignore[valid-type]
-        obj = await service.async_update(session, id, data.model_dump(exclude_unset=True))  # type: ignore[union-attr]
-        if obj is None:
-            raise HTTPException(status_code=404, detail="Item not found")
+    async def create_item(request: Request, data: CreateSchema, session=Depends(get_session)):  # type: ignore[valid-type]
+        payload = await _call(resource.before_create, data.model_dump(), session, request)  # type: ignore[union-attr]
+        obj = await service.async_create(session, payload)
+        await _call(resource.after_create, obj, session, request)
         return obj
 
-    @router.delete("/{id}", status_code=204, dependencies=[make_permission_dep("delete", resource)])
-    async def delete_item(id: int, session=Depends(get_session)):
-        if await service.async_delete(session, id) is None:
+    @router.patch("/{id}", response_model=ReadSchema, dependencies=[make_permission_dep("update", resource)])
+    async def update_item(id: int, request: Request, data: UpdateSchema, session=Depends(get_session)):  # type: ignore[valid-type]
+        obj = await service.async_get_one(session, id)
+        if obj is None:
             raise HTTPException(status_code=404, detail="Item not found")
+        patch = data.model_dump(exclude_unset=True)  # type: ignore[union-attr]
+        patch = await _call(resource.before_update, obj, patch, session, request)
+        updated = await service.async_update(session, id, patch)
+        if updated is None:
+            raise HTTPException(status_code=404, detail="Item not found")
+        await _call(resource.after_update, updated, session, request)
+        return updated
+
+    @router.delete("/{id}", status_code=204, dependencies=[make_permission_dep("delete", resource)])
+    async def delete_item(id: int, request: Request, session=Depends(get_session)):
+        obj = await service.async_get_one(session, id)
+        if obj is None:
+            raise HTTPException(status_code=404, detail="Item not found")
+        await _call(resource.before_delete, obj, session, request)
+        await service.async_delete(session, id)
+        await _call(resource.after_delete, obj, session, request)

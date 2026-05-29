@@ -8,9 +8,10 @@ from fastcms._async_routes import build_async_routes
 
 
 def create_router(resource: type[Resource], get_session) -> APIRouter:
-    model = resource.model
-    prefix = resource.prefix or f"/{model.__name__.lower()}s"
-    tags = resource.tags or [model.__name__]
+    resource_instance = resource()
+    model = resource_instance.model
+    prefix = resource_instance.prefix or f"/{model.__name__.lower()}s"
+    tags = resource_instance.tags or [model.__name__]
 
     service = CrudService(model, get_session)
     schemas = SchemaFactory.create_schema(model)
@@ -18,8 +19,8 @@ def create_router(resource: type[Resource], get_session) -> APIRouter:
     router = APIRouter(prefix=prefix, tags=tags)
 
     if service.async_mode:
-        build_async_routes(router, resource, service, get_session, schemas)
+        build_async_routes(router, resource_instance, service, get_session, schemas)
     else:
-        build_sync_routes(router, resource, service, get_session, schemas)
+        build_sync_routes(router, resource_instance, service, get_session, schemas)
 
     return router

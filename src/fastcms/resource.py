@@ -28,3 +28,21 @@ class Resource:
         super().__init_subclass__(**kwargs)
         if not hasattr(cls, "model"):
             raise TypeError(f"{cls.__name__} must define 'model'")
+
+    def before_create(self, data: dict, session, request) -> dict:
+        return data
+
+    def after_create(self, obj, session, request) -> None:
+        pass
+
+    def before_update(self, obj, data: dict, session, request) -> dict:
+        return data
+
+    def after_update(self, obj, session, request) -> None:
+        pass
+
+    def before_delete(self, obj, session, request) -> None:
+        pass
+
+    def after_delete(self, obj, session, request) -> None:
+        pass
