@@ -1,6 +1,9 @@
 # FastCMS
 
-Lightweight CRUD framework for FastAPI. Declare a resource — get a full API.
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+Lightweight CRUD framework for FastAPI. Declare a resource — get a full REST API.
 
 ```python
 class ArticleResource(Resource):
@@ -8,18 +11,37 @@ class ArticleResource(Resource):
 ```
 
 ```
-GET    /articles
+GET    /articles/
 GET    /articles/{id}
-POST   /articles
+POST   /articles/
 PATCH  /articles/{id}
 DELETE /articles/{id}
 ```
 
+---
+
+## Table of Contents
+
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Session Setup](#session-setup)
+- [Pagination](#pagination)
+- [Sorting](#sorting)
+- [Filters](#filters)
+- [Permissions](#permissions)
+- [Hooks](#hooks)
+- [Resource Options](#resource-options)
+- [Roadmap](#roadmap)
+
+---
+
 ## Installation
 
 ```bash
-pip install fastcms
+pip install git+https://github.com/Robanni/fastcms.git
 ```
+
+---
 
 ## Quick Start
 
@@ -37,6 +59,7 @@ class Article(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str]
     body: Mapped[str]
+    published: Mapped[bool] = mapped_column(default=False)
 ```
 
 ### 2. Create a resource
@@ -58,15 +81,15 @@ app = FastAPI()
 setup(app, resources=[ArticleResource], get_session=get_db)
 ```
 
-That's it. Full CRUD with pagination and OpenAPI docs at `/docs`.
+Full CRUD with pagination, sorting, and OpenAPI docs at `/docs`. No extra code.
 
 ---
 
 ## Session Setup
 
-FastCMS detects sync vs async mode from the return annotation of `get_session`.
+FastCMS auto-detects sync vs async mode from the return annotation of `get_session`.
 
-### Sync (SQLAlchemy `Session`)
+### Sync (`Session`)
 
 ```python
 from sqlalchemy import create_engine
@@ -79,7 +102,7 @@ def get_db() -> Session:
         yield session
 ```
 
-### Async (SQLAlchemy `AsyncSession`)
+### Async (`AsyncSession`)
 
 ```python
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -95,71 +118,46 @@ async def get_db() -> AsyncSession:
 
 ## Pagination
 
-All list endpoints support `offset` and `limit` query parameters.
+All list endpoints support `offset` and `limit` query params.
 
 ```
-GET /articles?offset=0&limit=20
+GET /articles/?offset=20&limit=10
 ```
-
-Response:
 
 ```json
 [
-  { "id": 1, "title": "Hello" },
-  { "id": 2, "title": "World" }
+  { "id": 21, "title": "Hello" },
+  { "id": 22, "title": "World" }
 ]
 ```
 
 ---
 
-## Permissions
+## Sorting
 
-Protect endpoints by adding `permissions` to your resource.
-
-Implement `BasePermission` with your own auth logic:
-
-```python
-from fastapi import HTTPException, Request
-from fastcms.permission import BasePermission
-
-class IsAuthenticated(BasePermission):
-    async def __call__(self, request: Request) -> None:
-        token = request.headers.get("Authorization")
-        if not token:
-            raise HTTPException(status_code=401, detail="Not authenticated")
-
-class IsAdmin(BasePermission):
-    async def __call__(self, request: Request) -> None:
-        user = await get_current_user(request)  # your auth logic
-        if not user.is_admin:
-            raise HTTPException(status_code=403, detail="Forbidden")
-```
-
-Assign permissions per action:
+Whitelist sortable fields via `sort_fields`, then use `?sort=` in requests.
 
 ```python
 class ArticleResource(Resource):
     model = Article
-    permissions = {
-        "list":     IsAuthenticated(),
-        "retrieve": IsAuthenticated(),
-        "create":   IsAdmin(),
-        "update":   IsAdmin(),
-        "delete":   IsAdmin(),
-    }
+    sort_fields = ["title", "created_at", "author_id"]
 ```
 
-Available actions: `list`, `retrieve`, `create`, `update`, `delete`.
+```
+GET /articles/?sort=-created_at          → newest first
+GET /articles/?sort=title                → A→Z
+GET /articles/?sort=-created_at,title    → multiple fields
+```
 
-Missing key = open endpoint (no check performed).
-
-Both sync and async `__call__` are supported.
+- Prefix `-` = DESC, no prefix = ASC
+- Unknown field → `400 Bad Request`
+- Works in both sync and async mode
 
 ---
 
 ## Filters
 
-Add query parameter filtering to list endpoints via `filter_class`.
+Declare filter fields via `filter_class`. Each field becomes an optional query param.
 
 ```python
 from fastcms import Filter
@@ -173,16 +171,92 @@ class ArticleResource(Resource):
     filter_class = ArticleFilter
 ```
 
-Each declared field becomes an optional query param. `None` fields are ignored — no WHERE clause added.
-
 ```
-GET /articles/                          → all articles
-GET /articles/?published=true           → published only
-GET /articles/?author_id=5              → by author
-GET /articles/?published=true&author_id=5  → combined
+GET /articles/                               → all
+GET /articles/?published=true                → published only
+GET /articles/?author_id=5                   → by author
+GET /articles/?published=true&author_id=5    → combined
 ```
 
-Fields not present in the model are silently ignored.
+`None` fields are ignored — no WHERE clause added. Fields absent from the model are silently skipped.
+
+---
+
+## Permissions
+
+Protect any endpoint by implementing `BasePermission`.
+
+```python
+from fastapi import HTTPException, Request
+from fastcms.permission import BasePermission
+
+class IsAuthenticated(BasePermission):
+    async def __call__(self, request: Request) -> None:
+        if not request.headers.get("Authorization"):
+            raise HTTPException(status_code=401, detail="Not authenticated")
+
+class IsAdmin(BasePermission):
+    async def __call__(self, request: Request) -> None:
+        user = await get_current_user(request)
+        if not user.is_admin:
+            raise HTTPException(status_code=403, detail="Forbidden")
+```
+
+Assign per action:
+
+```python
+class ArticleResource(Resource):
+    model = Article
+    permissions = {
+        "list":     IsAuthenticated(),
+        "retrieve": IsAuthenticated(),
+        "create":   IsAdmin(),
+        "update":   IsAdmin(),
+        "delete":   IsAdmin(),
+    }
+```
+
+| Action     | Endpoint              |
+|------------|-----------------------|
+| `list`     | `GET /articles/`      |
+| `retrieve` | `GET /articles/{id}`  |
+| `create`   | `POST /articles/`     |
+| `update`   | `PATCH /articles/{id}`|
+| `delete`   | `DELETE /articles/{id}`|
+
+Missing key = open endpoint. Both sync and async `__call__` supported.
+
+---
+
+## Hooks
+
+Intercept create / update / delete lifecycle with hooks on the resource class.
+
+```python
+class ArticleResource(Resource):
+    model = Article
+
+    async def before_create(self, data: dict, session, request) -> dict:
+        data["created_by"] = request.state.user_id
+        return data
+
+    async def after_create(self, obj, session, request) -> None:
+        await notify_subscribers(obj)
+
+    async def before_update(self, obj, data: dict, session, request) -> dict:
+        return data
+
+    async def after_update(self, obj, session, request) -> None: ...
+
+    async def before_delete(self, obj, session, request) -> None: ...
+
+    async def after_delete(self, obj, session, request) -> None: ...
+```
+
+- `before_*` hooks return (optionally mutated) data dict
+- `after_*` hooks receive the saved/deleted object
+- Both sync and async hooks supported
+- Default stubs are no-ops — safe to omit any hook
 
 ---
 
@@ -192,13 +266,16 @@ Fields not present in the model are silently ignored.
 class ArticleResource(Resource):
     model = Article
 
-    prefix = "/posts"           # default: "/{model_name_lowercase}s"
-    tags = ["Posts"]            # default: [model.__name__]
+    prefix = "/posts"              # default: /{model_name_lowercase}s
+    tags = ["Posts"]               # default: [model.__name__]
 
-    filter_class = ArticleFilter  # optional
+    filter_class = ArticleFilter   # optional
+    sort_fields = ["title", "created_at"]  # optional
 
     permissions = {
         "create": IsAuthenticated(),
+        "update": IsAdmin(),
+        "delete": IsAdmin(),
     }
 ```
 
@@ -206,4 +283,7 @@ class ArticleResource(Resource):
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for planned features including hooks, search, sorting, and relation expansion.
+See [ROADMAP.md](ROADMAP.md) for planned features.
+
+**Current:** v0.3.0 — sorting, filters, hooks, permissions, sync/async  
+**Next:** full-text search (`search_fields`), relation expansion (`expand=author`)
