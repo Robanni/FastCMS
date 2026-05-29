@@ -68,10 +68,29 @@ class ArticleResource(Resource):
 - `before_*` hooks can mutate and return data
 - Default no-op stubs — no error if hook not defined
 
-## v0.3 — Search, Sorting, Relations
+## v0.3 — Search, Sorting, Relations ✅ (sorting done)
+
+### Sorting ✅
+
+```python
+class ArticleResource(Resource):
+    model = Article
+    sort_fields = ["title", "created_at", "author_id"]
+```
+
+`GET /articles/?sort=-created_at,title`
+
+- `-field` = DESC, `field` = ASC
+- Multiple fields via comma
+- Whitelist via `sort_fields` — unknown field → 400
+- Sync and async both supported
+
+### Search (planned)
 
 - `search_fields` — full-text search via `LIKE`
-- `sort_fields` — `?sort=-created_at`
+
+### Relations (planned)
+
 - `expand` — inline relation expansion
 
 ```python
