@@ -30,11 +30,11 @@ def build_async_routes(
     if filter_dep is not None:
         @router.get("/", response_model=list[ReadSchema], dependencies=[make_permission_dep("list", resource)])
         async def get_list(limit: int = 20, offset: int = 0, session=Depends(get_session), filters=filter_dep):
-            return await service.async_get_list(session, offset, limit, filters=filters)
+            return await service.async_get_list(session, offset=offset, limit=limit, filters=filters)
     else:
         @router.get("/", response_model=list[ReadSchema], dependencies=[make_permission_dep("list", resource)])
         async def get_list(limit: int = 20, offset: int = 0, session=Depends(get_session)):  # type: ignore[misc]
-            return await service.async_get_list(session, offset, limit)
+            return await service.async_get_list(session, offset=offset, limit=limit)
 
     @router.get("/{id}", response_model=ReadSchema, dependencies=[make_permission_dep("retrieve", resource)])
     async def get_item(id: int, session=Depends(get_session)):
@@ -46,6 +46,8 @@ def build_async_routes(
     @router.post("/", response_model=ReadSchema, status_code=201, dependencies=[make_permission_dep("create", resource)])
     async def create_item(request: Request, data: CreateSchema, session=Depends(get_session)):  # type: ignore[valid-type]
         payload = await _call(resource.before_create, data.model_dump(), session, request)  # type: ignore[union-attr]
+        if payload is None:
+            raise ValueError(f"{resource.__class__.__name__}.before_create must return a dict, got None")
         obj = await service.async_create(session, payload)
         await _call(resource.after_create, obj, session, request)
         return obj
@@ -57,9 +59,9 @@ def build_async_routes(
             raise HTTPException(status_code=404, detail="Item not found")
         patch = data.model_dump(exclude_unset=True)  # type: ignore[union-attr]
         patch = await _call(resource.before_update, obj, patch, session, request)
-        updated = await service.async_update(session, id, patch)
-        if updated is None:
-            raise HTTPException(status_code=404, detail="Item not found")
+        if patch is None:
+            raise ValueError(f"{resource.__class__.__name__}.before_update must return a dict, got None")
+        updated = await service.async_update(session, obj, patch)
         await _call(resource.after_update, updated, session, request)
         return updated
 
@@ -69,5 +71,5 @@ def build_async_routes(
         if obj is None:
             raise HTTPException(status_code=404, detail="Item not found")
         await _call(resource.before_delete, obj, session, request)
-        await service.async_delete(session, id)
-        await _call(resource.after_delete, obj, session, request)
+        deleted_data = await service.async_delete(session, obj)
+        await _call(resource.after_delete, deleted_data, session, request)

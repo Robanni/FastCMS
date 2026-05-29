@@ -1,3 +1,5 @@
+import inspect
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
@@ -7,6 +9,8 @@ from fastcms.service import CrudService
 
 type AnySchema = type[BaseModel]
 
+_HOOKS = ("before_create", "after_create", "before_update", "after_update", "before_delete", "after_delete")
+
 
 def build_sync_routes(
     router: APIRouter,
@@ -15,6 +19,14 @@ def build_sync_routes(
     get_session,
     schemas: tuple[AnySchema, AnySchema, AnySchema],
 ) -> None:
+    for name in _HOOKS:
+        method = getattr(resource, name)
+        if inspect.iscoroutinefunction(method):
+            raise TypeError(
+                f"{resource.__class__.__name__}.{name} is async but router uses sync session. "
+                "Pass an async session factory to use async hooks."
+            )
+
     ReadSchema, CreateSchema, UpdateSchema = schemas
     filter_dep = make_filter_dep(resource)
 
@@ -37,6 +49,8 @@ def build_sync_routes(
     @router.post("/", response_model=ReadSchema, status_code=201, dependencies=[make_permission_dep("create", resource)])
     def create_item(request: Request, data: CreateSchema, session=Depends(get_session)):  # type: ignore[valid-type]
         payload = resource.before_create(data.model_dump(), session, request)  # type: ignore[union-attr]
+        if payload is None:
+            raise ValueError(f"{resource.__class__.__name__}.before_create must return a dict, got None")
         obj = service.create(session, payload)
         resource.after_create(obj, session, request)
         return obj
@@ -48,9 +62,9 @@ def build_sync_routes(
             raise HTTPException(status_code=404, detail="Item not found")
         patch = data.model_dump(exclude_unset=True)  # type: ignore[union-attr]
         patch = resource.before_update(obj, patch, session, request)
-        updated = service.update(session, id, patch)
-        if updated is None:
-            raise HTTPException(status_code=404, detail="Item not found")
+        if patch is None:
+            raise ValueError(f"{resource.__class__.__name__}.before_update must return a dict, got None")
+        updated = service.update(session, obj, patch)
         resource.after_update(updated, session, request)
         return updated
 
@@ -60,5 +74,5 @@ def build_sync_routes(
         if obj is None:
             raise HTTPException(status_code=404, detail="Item not found")
         resource.before_delete(obj, session, request)
-        service.delete(session, id)
-        resource.after_delete(obj, session, request)
+        deleted_data = service.delete(session, obj)
+        resource.after_delete(deleted_data, session, request)

@@ -44,5 +44,5 @@ class Resource:
     def before_delete(self, obj, session, request) -> None:
         pass
 
-    def after_delete(self, obj, session, request) -> None:
+    def after_delete(self, data: dict, session, request) -> None:
         pass

@@ -46,21 +46,23 @@ def test_get_list_pagination(service: CrudService[Article], session):
 
 def test_update(service: CrudService[Article], session):
     obj = service.create(session, {"title": "Old"})
-    updated = service.update(session, obj.id, {"title": "New"})
+    updated = service.update(session, obj, {"title": "New"})
     assert updated.title == "New"
 
 
 def test_update_not_found(service: CrudService[Article], session):
-    assert service.update(session, 9999, {"title": "X"}) is None
+    obj = service.get_one(session, 9999)
+    assert obj is None
 
 
 def test_delete(service: CrudService[Article], session):
     obj = service.create(session, {"title": "Delete me"})
-    deleted = service.delete(session, obj.id)
-    assert deleted is not None
-    assert deleted.title == "Delete me"
-    assert service.get_one(session, obj.id) is None
+    obj_id = obj.id
+    deleted_data = service.delete(session, obj)
+    assert deleted_data["title"] == "Delete me"
+    assert service.get_one(session, obj_id) is None
 
 
 def test_delete_not_found(service: CrudService[Article], session):
-    assert service.delete(session, 9999) is None
+    obj = service.get_one(session, 9999)
+    assert obj is None

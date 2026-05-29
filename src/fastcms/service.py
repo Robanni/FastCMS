@@ -47,39 +47,26 @@ class CrudService(Generic[T]):
         session.refresh(obj)
         return obj
 
-    def update(
-        self,
-        session: Session,
-        id: int,
-        data: dict,
-    ) -> T | None:
-        obj = session.get(self.model, id)
-        if obj is None:
-            return None
+    def update(self, session: Session, obj: T, data: dict) -> T:
         for key, value in data.items():
             setattr(obj, key, value)
         session.commit()
         session.refresh(obj)
         return obj
 
-    def delete(
-        self,
-        session: Session,
-        id: int,
-    ) -> T | None:
-        obj = session.get(self.model, id)
-        if obj is None:
-            return None
+    def delete(self, session: Session, obj: T) -> dict:
+        from sqlalchemy import inspect as sa_inspect
+        data = {c.key: getattr(obj, c.key) for c in sa_inspect(obj).mapper.column_attrs}
         session.delete(obj)
         session.commit()
-        return obj
+        return data
 
     # --- async ---
     async def async_get_list(
         self,
         session: AsyncSession,
-        limit: int = 20,
         offset: int = 0,
+        limit: int = 20,
         filters=None,
     ) -> list[T]:
         query = select(self.model)
@@ -98,22 +85,16 @@ class CrudService(Generic[T]):
         await session.refresh(obj)
         return obj
 
-    async def async_update(
-        self, session: AsyncSession, id: int, data: dict
-    ) -> T | None:
-        obj = await session.get(self.model, id)
-        if obj is None:
-            return None
+    async def async_update(self, session: AsyncSession, obj: T, data: dict) -> T:
         for key, value in data.items():
             setattr(obj, key, value)
         await session.commit()
         await session.refresh(obj)
         return obj
 
-    async def async_delete(self, session: AsyncSession, id: int) -> T | None:
-        obj = await session.get(self.model, id)
-        if obj is None:
-            return None
+    async def async_delete(self, session: AsyncSession, obj: T) -> dict:
+        from sqlalchemy import inspect as sa_inspect
+        data = {c.key: getattr(obj, c.key) for c in sa_inspect(obj).mapper.column_attrs}
         await session.delete(obj)
         await session.commit()
-        return obj
+        return data
