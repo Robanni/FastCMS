@@ -1,4 +1,4 @@
-import inspect
+import typing
 
 from sqlalchemy import Select, select, asc, desc
 from typing import Callable, Generic, TypeVar
@@ -14,8 +14,17 @@ type SessionFactory = Callable[..., AnySession]
 
 
 def _is_async(get_session: SessionFactory) -> bool:
-    hints = inspect.get_annotations(get_session)
-    return hints.get("return") is AsyncSession
+    hints = typing.get_type_hints(get_session)
+    ret = hints.get("return")
+    if ret is None:
+        return False
+    if ret is AsyncSession:
+        return True
+    origin = typing.get_origin(ret)
+    args = typing.get_args(ret)
+    if origin is not None and args:
+        return args[0] is AsyncSession
+    return False
 
 
 class CrudService(Generic[T]):
