@@ -30,6 +30,7 @@ DELETE /articles/{id}
 - [Filters](#filters)
 - [Permissions](#permissions)
 - [Hooks](#hooks)
+- [Field & Route Control](#field--route-control)
 - [Resource Options](#resource-options)
 - [Roadmap](#roadmap)
 
@@ -260,6 +261,45 @@ class ArticleResource(Resource):
 
 ---
 
+## Field & Route Control
+
+### `read_only` / `write_only`
+
+Exclude fields from the Create/Update or Read schema — independent of permissions, enforced at the schema level for every request.
+
+```python
+class ArticleResource(Resource):
+    model = Article
+    read_only = {"created_at", "updated_at"}   # never in Create/Update, still in Read
+    write_only = {"internal_note"}             # never in Read, still writable
+```
+
+A `read_only` field sent in a request body is silently ignored — the server-side/default value wins, not a `422`.
+
+### `actions`
+
+Restrict which routes get generated at all. Excluded actions are absent from the router entirely — not just permission-denied, also gone from `/docs` and `openapi.json`.
+
+```python
+from fastcms.resource import Action
+
+class ReadOnlyResource(Resource):
+    model = Article
+    actions = frozenset({Action.LIST, Action.RETRIEVE})
+```
+
+| `Action`   | Endpoint                |
+|------------|--------------------------|
+| `LIST`     | `GET /articles/`         |
+| `RETRIEVE` | `GET /articles/{id}`     |
+| `CREATE`   | `POST /articles/`        |
+| `UPDATE`   | `PATCH /articles/{id}`   |
+| `DELETE`   | `DELETE /articles/{id}`  |
+
+Default: all actions enabled. Useful for duplicating a resource under a different `prefix` to expose a narrower API (e.g. public read-only vs admin full CRUD) without juggling permissions.
+
+---
+
 ## Resource Options
 
 ```python
@@ -271,6 +311,10 @@ class ArticleResource(Resource):
 
     filter_class = ArticleFilter   # optional
     sort_fields = ["title", "created_at"]  # optional
+
+    read_only = {"created_at", "updated_at"}  # optional
+    write_only = {"internal_note"}            # optional
+    actions = frozenset({Action.LIST, Action.RETRIEVE})  # optional, default: all
 
     permissions = {
         "create": IsAuthenticated(),
@@ -285,5 +329,5 @@ class ArticleResource(Resource):
 
 See [ROADMAP.md](ROADMAP.md) for planned features.
 
-**Current:** v0.3.0 — sorting, filters, hooks, permissions, sync/async  
+**Current:** v0.3.0 — sorting, filters, hooks, permissions, field/route control, sync/async  
 **Next:** full-text search (`search_fields`), relation expansion (`expand=author`)

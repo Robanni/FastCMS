@@ -97,6 +97,25 @@ class ArticleResource(Resource):
 GET /articles/1?expand=author
 ```
 
+### Field & route control ✅
+
+```python
+class ArticleResource(Resource):
+    model = Article
+    read_only = {"created_at", "updated_at"}
+    write_only = {"internal_note"}
+    actions = frozenset({Action.LIST, Action.RETRIEVE})
+```
+
+- `read_only` — field excluded from Create/Update schemas, still in Read
+- `write_only` — field excluded from Read schema, still writable
+- `actions` — restrict which routes get generated (`Action.LIST/RETRIEVE/CREATE/UPDATE/DELETE`); excluded routes are absent from OpenAPI, not just permission-denied
+
+### Per-role field visibility (planned)
+
+- Dynamic, per-request field read/write rules (e.g. owner vs admin) — separate axis from the static `read_only`/`write_only` allowlist
+- Needs object-level permission support (`obj` reaching `BasePermission.__call__`) before this can land
+
 ## v1.0 — Production Ready
 
 - Nested resources
