@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import enum
 from typing import TYPE_CHECKING
 
 from sqlalchemy.orm import DeclarativeBase
@@ -8,6 +9,17 @@ from fastcms.permission import BasePermission
 
 if TYPE_CHECKING:
     from fastcms.filter import Filter
+
+
+class Action(enum.Enum):
+    LIST = "list"
+    RETRIEVE = "retrieve"
+    CREATE = "create"
+    UPDATE = "update"
+    DELETE = "delete"
+
+
+ALL_ACTIONS: frozenset[Action] = frozenset(Action)
 
 
 class Resource:
@@ -26,6 +38,9 @@ class Resource:
 
     read_only: set[str] = set()
     write_only: set[str] = set()
+
+    # Which routes to generate. Default: all of them.
+    actions: frozenset[Action] = ALL_ACTIONS
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
