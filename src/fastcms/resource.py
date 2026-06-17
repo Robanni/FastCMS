@@ -24,6 +24,9 @@ class Resource:
     prefix: str | None = None
     tags: list[str] | None = None
 
+    read_only: set[str] = set()
+    write_only: set[str] = set()
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
         if not hasattr(cls, "model"):

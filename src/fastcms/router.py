@@ -12,9 +12,13 @@ def create_router(resource: type[Resource], get_session) -> APIRouter:
     model = resource_instance.model
     prefix = resource_instance.prefix or f"/{model.__name__.lower()}s"
     tags = resource_instance.tags or [model.__name__]
+    read_only = resource_instance.read_only
+    write_only = resource_instance.write_only
 
     service = CrudService(model, get_session)
-    schemas = SchemaFactory.create_schema(model)
+    schemas = SchemaFactory.create_schema(
+        model, read_only=read_only, write_only=write_only
+    )
 
     router = APIRouter(prefix=prefix, tags=tags)
 

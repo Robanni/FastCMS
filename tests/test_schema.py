@@ -50,13 +50,31 @@ def test_full_types_field_types():
     read, _, _ = SchemaFactory.create_schema(FullTypesModel)
     fields = read.model_fields
 
-    assert fields["big_num"].annotation == int
-    assert fields["name"].annotation == str
-    assert fields["score"].annotation == float
-    assert fields["price"].annotation == decimal.Decimal
+    assert fields["big_num"].annotation is int
+    assert fields["name"].annotation is str
+    assert fields["score"].annotation is float
+    assert fields["price"].annotation is decimal.Decimal
     assert fields["born"].annotation == datetime.date | None
     assert fields["alarm"].annotation == datetime.time | None
-    assert fields["created_at"].annotation == datetime.datetime
+    assert fields["created_at"].annotation is datetime.datetime
     assert fields["uid"].annotation == uuid.UUID | None
-    assert fields["status"].annotation == str
+    assert fields["status"].annotation is str
     assert fields["bio"].annotation == str | None
+
+
+def test_read_only_field_excluded_from_create_and_update():
+    read, create, update = SchemaFactory.create_schema(
+        FullTypesModel, read_only={"created_at"}
+    )
+    assert "created_at" in read.model_fields
+    assert "created_at" not in create.model_fields
+    assert "created_at" not in update.model_fields
+
+
+def test_write_only_field_excluded_from_read():
+    read, create, update = SchemaFactory.create_schema(
+        Article, write_only={"author_id"}
+    )
+    assert "author_id" not in read.model_fields
+    assert "author_id" in create.model_fields
+    assert "author_id" in update.model_fields
