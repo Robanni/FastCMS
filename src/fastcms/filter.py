@@ -7,17 +7,17 @@ from sqlalchemy.orm import DeclarativeBase
 
 
 _LOOKUPS = {
-    "eq":         lambda col, v: col == v,
-    "ne":         lambda col, v: col != v,
-    "gt":         lambda col, v: col > v,
-    "gte":        lambda col, v: col >= v,
-    "lt":         lambda col, v: col < v,
-    "lte":        lambda col, v: col <= v,
-    "contains":   lambda col, v: col.contains(v),
+    "eq": lambda col, v: col == v,
+    "ne": lambda col, v: col != v,
+    "gt": lambda col, v: col > v,
+    "gte": lambda col, v: col >= v,
+    "lt": lambda col, v: col < v,
+    "lte": lambda col, v: col <= v,
+    "contains": lambda col, v: col.contains(v),
     "startswith": lambda col, v: col.startswith(v),
-    "endswith":   lambda col, v: col.endswith(v),
-    "in":         lambda col, v: col.in_(v),
-    "isnull":     lambda col, v: col.is_(None) if v else col.is_not(None),
+    "endswith": lambda col, v: col.endswith(v),
+    "in": lambda col, v: col.in_(v),
+    "isnull": lambda col, v: col.is_(None) if v else col.is_not(None),
 }
 
 

@@ -27,6 +27,10 @@ class Resource:
 
     permissions: dict[str, BasePermission] = {}
 
+    # Generic pre-handlers (rate limiting, captcha, custom checks).
+    # Raise HTTPException to block. Silent return = pass.
+    guards: dict[Action, list] = {}
+
     # Optional filter class — subclass of Filter
     filter_class: type[Filter] | None = None
 

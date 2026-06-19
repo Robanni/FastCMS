@@ -8,6 +8,8 @@ from fastapi import Depends, Query, Request
 from fastapi.params import Depends as DependsType
 from pydantic import ValidationError
 
+from fastcms.resource import Action
+
 if TYPE_CHECKING:
     from fastcms.resource import Resource
 
@@ -44,7 +46,10 @@ def _make_list_filter_dep(filter_cls) -> DependsType:
             return filter_cls.model_validate(params)
         except ValidationError as exc:
             from fastapi import HTTPException
-            raise HTTPException(status_code=422, detail=exc.errors(include_url=False)) from exc
+
+            raise HTTPException(
+                status_code=422, detail=exc.errors(include_url=False)
+            ) from exc
 
     _dep.__signature__ = inspect.Signature(params_list)  # type: ignore[attr-defined]
     _dep.__name__ = f"filter_dep_{filter_cls.__name__}"
@@ -57,9 +62,7 @@ def make_filter_dep(resource: Resource) -> DependsType | None:
         return None
 
     filter_cls = resource.filter_class
-    has_list_field = any(
-        _is_list_field(fi) for fi in filter_cls.model_fields.values()
-    )
+    has_list_field = any(_is_list_field(fi) for fi in filter_cls.model_fields.values())
 
     if not has_list_field:
         return Depends(filter_cls)
@@ -84,6 +87,7 @@ def make_sort_dep(resource: Resource) -> DependsType | None:
             field = part.lstrip("-")
             if field not in allowed:
                 from fastapi import HTTPException
+
                 raise HTTPException(
                     status_code=400,
                     detail=f"Sort field '{field}' not allowed. Allowed: {', '.join(allowed)}",
@@ -92,6 +96,20 @@ def make_sort_dep(resource: Resource) -> DependsType | None:
         return result or None
 
     return Depends(_dep)
+
+
+def make_guard_deps(action: Action, resource: Resource) -> list[DependsType]:
+    guards = resource.guards.get(action, [])
+    result = []
+    for guard in guards:
+
+        async def dep(request: Request, _guard=guard) -> None:
+            res = _guard(request)
+            if inspect.isawaitable(res):
+                await res
+
+        result.append(Depends(dep))
+    return result
 
 
 def make_permission_dep(action: str, resource: Resource) -> DependsType | None:
